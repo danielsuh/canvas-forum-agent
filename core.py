@@ -29,7 +29,8 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-CONTROL_RE = re.compile(r"^COURSE-TEAM CONTROL:\s*(RUNNING|PAUSED)\s*$")
+CONTROL_PREFIX_RE = re.compile(r"^[\s*#_>\-]*COURSE-TEAM CONTROL:(.*)$")
+CONTROL_WORD_RE = re.compile(r"\b(RUNNING|PAUSED)\b")
 ALLOWED_HOSTS = {"canvas.mit.edu", "127.0.0.1", "localhost"}
 INJECTION_HINTS = re.compile(
     r"(ignore (all |any |your )?(previous|prior|above)|system prompt|developer message|"
@@ -366,8 +367,12 @@ class Forum:
             raise CanvasError("malformed", "topic was not an object")
         lines = [l.strip() for l in strip_html(topic.get("message") or "").splitlines() if l.strip()]
         first = lines[0] if lines else ""
-        m = CONTROL_RE.match(first)
-        return m.group(1) if m else "UNKNOWN"
+        m = CONTROL_PREFIX_RE.match(first)
+        if not m:
+            return "UNKNOWN"
+        words = set(CONTROL_WORD_RE.findall(m.group(1)))
+        # Exactly one state word on the top line. Zero or both means we cannot be sure: fail closed.
+        return words.pop() if len(words) == 1 else "UNKNOWN"
 
     def read_view(self):
         view = self.client.get(self.view_path)
