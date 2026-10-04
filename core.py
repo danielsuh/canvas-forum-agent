@@ -69,7 +69,7 @@ class Config:
                  state_dir=None, max_posts_per_hour=3, max_body_chars=1500,
                  min_body_chars=20, max_failures=3, retries=3, backoff_base=2.0,
                  backoff_cap=60.0, timeout=20.0, max_batch=8, wake_idle_hours=12.0,
-                 similarity_limit=0.8):
+                 similarity_limit=0.8, signature="-written by an AI agent"):
         self.token = token
         self.course_id = str(course_id)
         self.topic_id = str(topic_id)
@@ -86,6 +86,7 @@ class Config:
         self.max_batch = int(max_batch)
         self.wake_idle_hours = float(wake_idle_hours)
         self.similarity_limit = float(similarity_limit)
+        self.signature = (signature or "").strip()
         self._validate()
 
     def _validate(self):
@@ -99,6 +100,8 @@ class Config:
             raise ConfigError("base url host is not on the allow list: %s" % host)
         if host == "canvas.mit.edu" and parsed.scheme != "https":
             raise ConfigError("canvas.mit.edu must use https")
+        if len(self.signature) > 100 or URL_RE.search(self.signature) or EMAIL_RE.search(self.signature):
+            raise ConfigError("signature must be under 100 characters with no links or email addresses")
 
     @classmethod
     def from_env(cls, env=None):
@@ -113,6 +116,8 @@ class Config:
             kw["state_dir"] = env["CANVAS_AGENT_HOME"]
         if env.get("CANVAS_WAKE_IDLE_HOURS"):
             kw["wake_idle_hours"] = env["CANVAS_WAKE_IDLE_HOURS"]
+        if "CANVAS_POST_SIGNATURE" in env:
+            kw["signature"] = env["CANVAS_POST_SIGNATURE"]
         return cls(env["CANVAS_TOKEN"], env["CANVAS_COURSE_ID"], env["CANVAS_TOPIC_ID"], **kw)
 
     def __repr__(self):
@@ -438,6 +443,19 @@ class Forum:
                 resolved.append((key, "abandoned"))
         return resolved
 
+    # ---- signature ---------------------------------------------------------------
+    def strip_signature(self, text: str) -> str:
+        """Remove our own signature line from the end, so it is never doubled or judged as content."""
+        sig = self.cfg.signature
+        t = (text or "").rstrip()
+        while sig and t.endswith(sig):
+            t = t[: -len(sig)].rstrip()
+        return t
+
+    def with_signature(self, body: str) -> str:
+        sig = self.cfg.signature
+        return "%s\n\n%s" % (body, sig) if sig else body
+
     # ---- validation of drafts ----------------------------------------------------
     def validate_body(self, body: str):
         body = CTRL_CHARS.sub("", body or "").strip()
@@ -506,7 +524,7 @@ class Forum:
         parent_id = str(parent_id) if parent_id else None
         if self.halted():
             return {"ok": False, "posted": False, "error": "halted", "reason": d["halted_reason"]}
-        clean, why = self.validate_body(body)
+        clean, why = self.validate_body(self.strip_signature(body))
         if why:
             st.log("refused", reason=why)
             return {"ok": False, "posted": False, "error": "invalid_body", "reason": why}
@@ -516,14 +534,15 @@ class Forum:
             self.record_failure(e)
             return {"ok": False, "posted": False, "error": e.kind, "message": str(e)}
 
-        key = self.make_key(parent_id, clean)
+        text = self.with_signature(clean)       # the signature is added by code, never by the model
+        key = self.make_key(parent_id, text)
         intent = d["intents"].get(key)
         if intent and intent["status"] == "posted":
             st.log("refused", reason="duplicate", key=key)
             return {"ok": False, "posted": False, "error": "duplicate", "entry_id": intent.get("entry_id")}
         for p in d["posts"][-10:]:
             prior = d["intents"].get(p["key"], {}).get("body", "")
-            if prior and jaccard(prior, clean) >= self.cfg.similarity_limit:
+            if prior and jaccard(self.strip_signature(prior), clean) >= self.cfg.similarity_limit:
                 st.log("refused", reason="too_similar_to_earlier_post", key=key)
                 return {"ok": False, "posted": False, "error": "too_similar"}
         if st.posts_in_window() >= self.cfg.max_posts_per_hour:
@@ -531,10 +550,10 @@ class Forum:
             return {"ok": False, "posted": False, "error": "rate_limited",
                     "reason": "limit of %d posts per hour reached" % self.cfg.max_posts_per_hour}
 
-        d["intents"][key] = {"status": "pending", "ts": self.clock(), "parent_id": parent_id, "body": clean}
+        d["intents"][key] = {"status": "pending", "ts": self.clock(), "parent_id": parent_id, "body": text}
         st.save()
         path = self.entries_path if not parent_id else "%s/%s/replies" % (self.entries_path, parent_id)
-        form = {"message": to_html(clean)}
+        form = {"message": to_html(text)}
         last_err = None
         for attempt in range(1, self.cfg.retries + 1):
             try:
@@ -548,7 +567,7 @@ class Forum:
                 if not isinstance(resp, dict) or "id" not in resp:
                     raise CanvasError("malformed", "write response had no entry id")
                 entry_id = str(resp["id"])
-                verified = self._verify(entry_id, clean)
+                verified = self._verify(entry_id, text)
                 self._finalize(key, entry_id, parent_id, how="direct" if attempt == 1 else "direct_after_retry")
                 self.record_success()
                 return {"ok": True, "posted": True, "entry_id": entry_id, "verified": verified}
@@ -558,7 +577,7 @@ class Forum:
                     break
                 # Ambiguous failure: the write may have landed. Look before retrying.
                 try:
-                    hit = self._find_posted(clean, parent_id)
+                    hit = self._find_posted(text, parent_id)
                 except CanvasError:
                     hit = None
                 if hit:
