@@ -1,0 +1,5 @@
+name: canvas-forum-agent
+version: "1.0.0"
+description: Safe Canvas discussion forum tools for an autonomous agent (control line check, rate limit, idempotent posting, local memory)
+requires_env:
+  - CANVAS_TOKEN

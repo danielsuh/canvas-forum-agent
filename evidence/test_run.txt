@@ -1,0 +1,34 @@
+test_bad_token_halts_immediately (test_forum.TestFailureRecovery.test_bad_token_halts_immediately) ... ok
+test_crash_mid_write_then_restart_recovers_without_duplicate (test_forum.TestFailureRecovery.test_crash_mid_write_then_restart_recovers_without_duplicate) ... ok
+test_get_retries_on_503 (test_forum.TestFailureRecovery.test_get_retries_on_503) ... ok
+test_halts_after_three_failed_cycles_and_human_reset (test_forum.TestFailureRecovery.test_halts_after_three_failed_cycles_and_human_reset) ... ok
+test_lost_acknowledgement_creates_no_duplicate (test_forum.TestFailureRecovery.test_lost_acknowledgement_creates_no_duplicate)
+The write lands, the response never arrives. The agent must not post again. ... ok
+test_malformed_ack_creates_no_duplicate (test_forum.TestFailureRecovery.test_malformed_ack_creates_no_duplicate) ... ok
+test_retry_with_backoff_on_http_500_then_success (test_forum.TestFailureRecovery.test_retry_with_backoff_on_http_500_then_success) ... ok
+test_timeout_after_write_creates_no_duplicate (test_forum.TestFailureRecovery.test_timeout_after_write_creates_no_duplicate) ... ok
+test_agent_skip_is_logged (test_forum.TestGate.test_agent_skip_is_logged) ... ok
+test_gate_skips_when_nothing_new_then_wakes_for_new_entry (test_forum.TestGate.test_gate_skips_when_nothing_new_then_wakes_for_new_entry) ... ok
+test_gate_wakes_after_idle_period_for_original_post (test_forum.TestGate.test_gate_wakes_after_idle_period_for_original_post) ... ok
+test_own_posts_are_ignored_and_entries_not_repeated (test_forum.TestNormalOperation.test_own_posts_are_ignored_and_entries_not_repeated) ... ok
+test_post_is_saved_and_verified (test_forum.TestNormalOperation.test_post_is_saved_and_verified) ... ok
+test_reply_goes_under_parent (test_forum.TestNormalOperation.test_reply_goes_under_parent) ... ok
+test_state_survives_restart (test_forum.TestNormalOperation.test_state_survives_restart) ... ok
+test_bad_drafts_refused (test_forum.TestSafetyRules.test_bad_drafts_refused) ... ok
+test_control_checked_before_every_write (test_forum.TestSafetyRules.test_control_checked_before_every_write) ... ok
+test_duplicate_and_near_duplicate_refused (test_forum.TestSafetyRules.test_duplicate_and_near_duplicate_refused) ... ok
+test_max_three_posts_per_hour_then_window_expires (test_forum.TestSafetyRules.test_max_three_posts_per_hour_then_window_expires) ... ok
+test_paused_forum_blocks_post_and_check (test_forum.TestSafetyRules.test_paused_forum_blocks_post_and_check) ... ok
+test_redirects_are_not_followed (test_forum.TestSafetyRules.test_redirects_are_not_followed) ... ok
+test_token_never_written_to_disk (test_forum.TestSafetyRules.test_token_never_written_to_disk) ... ok
+test_unrecognised_control_line_fails_closed (test_forum.TestSafetyRules.test_unrecognised_control_line_fails_closed) ... ok
+test_untrusted_text_is_sanitized_and_labelled (test_forum.TestSafetyRules.test_untrusted_text_is_sanitized_and_labelled) ... ok
+test_admin_status_and_reset (test_forum.TestScripts.test_admin_status_and_reset) ... ok
+test_gate_script_errors_without_token (test_forum.TestScripts.test_gate_script_errors_without_token) ... ok
+test_gate_script_prints_wake_json_and_never_the_token (test_forum.TestScripts.test_gate_script_prints_wake_json_and_never_the_token) ... ok
+test_gate_script_silent_when_paused (test_forum.TestScripts.test_gate_script_silent_when_paused) ... ok
+
+----------------------------------------------------------------------
+Ran 28 tests in 15.391s
+
+OK
